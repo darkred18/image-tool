@@ -41,7 +41,7 @@ mixin ColorPickerMixin on ChangeNotifier {
   }
 
   void resetColorPicker() {
-    _colorPickerBoxSize = 120.0;
+    _colorPickerBoxSize = 50.0;
     _previewImage = null;
     _paintMixes = [];
     _isAnalyzing = false;

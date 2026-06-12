@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.2
   dartcv4: ^2.2.1+4
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:

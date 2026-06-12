@@ -142,7 +142,7 @@ class _ImageCanvasState extends State<ImageCanvas> {
                       File(
                         widget.controller.previewCropPath ?? widget.imageUrl,
                       ),
-                      fit: BoxFit.fill,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   if (widget.controller.activeTool == EditTool.grid)
