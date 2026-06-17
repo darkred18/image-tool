@@ -6,10 +6,10 @@ class PerspectiveCropOverlay extends StatefulWidget {
   final Size imageSize;
 
   const PerspectiveCropOverlay({
-    Key? key,
+    super.key,
     required this.controller,
     required this.imageSize,
-  }) : super(key: key);
+  });
 
   @override
   State<PerspectiveCropOverlay> createState() => _PerspectiveCropOverlayState();
@@ -54,9 +54,10 @@ class _PerspectiveCropOverlayState extends State<PerspectiveCropOverlay> {
     final points = _points;
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         CustomPaint(
-          size: widget.imageSize,
+          // size: widget.imageSize,
           painter: _PolygonLinePainter(points: points),
         ),
         ...List.generate(4, (i) => _buildHandle(i, points)),
@@ -75,10 +76,8 @@ class _PerspectiveCropOverlayState extends State<PerspectiveCropOverlay> {
         onPanUpdate: (details) {
           final updated = List<Offset>.from(points);
           final newPos = updated[index] + details.delta;
-          updated[index] = Offset(
-            newPos.dx.clamp(0.0, widget.imageSize.width),
-            newPos.dy.clamp(0.0, widget.imageSize.height),
-          );
+
+          updated[index] = newPos;
           _updatePoints(updated);
         },
         child: Container(

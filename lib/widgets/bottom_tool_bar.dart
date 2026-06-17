@@ -43,6 +43,12 @@ class BottomToolBar extends StatelessWidget {
                   tool: EditTool.colorPicker,
                   controller: controller,
                 ),
+                _ToolButton(
+                  icon: Icons.auto_awesome,
+                  label: '필터',
+                  tool: EditTool.filter,
+                  controller: controller,
+                ),
               ],
             ),
           ),

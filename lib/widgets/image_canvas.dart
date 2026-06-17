@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_tools/controller/edit_page_controller.dart';
 import 'package:image_tools/features/color_picker/color_picker_overlay.dart';
 import 'package:image_tools/features/grid/grid_overlay.dart';
-import 'package:image_tools/features/perspective_crop/perspective_crop_overlay.dart';
 
 class ImageCanvas extends StatefulWidget {
   final String imageUrl;
@@ -35,7 +34,10 @@ class _ImageCanvasState extends State<ImageCanvas> {
   @override
   void didUpdateWidget(covariant ImageCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
+    // 이미지 경로가 바뀌었거나(스와이프), 크롭된 경로가 새로 생성되었다면 다시 계산
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.controller.previewCropPath !=
+            widget.controller.previewCropPath) {
       _clearStream();
       setState(() {
         _rawImageSize = null;
@@ -132,40 +134,19 @@ class _ImageCanvasState extends State<ImageCanvas> {
               widget.controller.updateImageWidgetSize(renderedSize);
             });
 
-            return SizedBox(
-              width: renderedSize.width,
-              height: renderedSize.height,
+            return SizedBox.expand(
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: Image.file(
                       File(
-                        widget.controller.previewCropPath ?? widget.imageUrl,
+                        widget.controller.filterPreviewPath ??
+                            widget.controller.previewCropPath ??
+                            widget.imageUrl,
                       ),
                       fit: BoxFit.contain,
                     ),
                   ),
-                  if (widget.controller.activeTool == EditTool.grid)
-                    Positioned.fill(
-                      child: GridOverlay(
-                        controller: widget.controller,
-                        imageSize: renderedSize,
-                      ),
-                    ),
-                  if (widget.controller.activeTool == EditTool.perspective)
-                    Positioned.fill(
-                      child: PerspectiveCropOverlay(
-                        controller: widget.controller,
-                        imageSize: renderedSize,
-                      ),
-                    ),
-                  if (widget.controller.activeTool == EditTool.colorPicker)
-                    Positioned.fill(
-                      child: ColorPickerOverlay(
-                        controller: widget.controller,
-                        imageUrl: widget.imageUrl,
-                      ),
-                    ),
                 ],
               ),
             );

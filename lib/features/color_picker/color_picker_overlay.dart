@@ -6,11 +6,13 @@ import 'package:image_tools/features/color_picker/color_alalysis_service.dart';
 
 class ColorPickerOverlay extends StatefulWidget {
   final EditPageController controller;
+  final Size imageSize;
   final String imageUrl;
 
   const ColorPickerOverlay({
     super.key,
     required this.controller,
+    required this.imageSize,
     required this.imageUrl,
   });
 
@@ -102,51 +104,48 @@ class _ColorPickerOverlayState extends State<ColorPickerOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final boxSize = widget.controller.colorPickerBoxSize;
-        final half = boxSize / 2;
+    // 💡 부모(SizedBox)가 정해준 명확한 이미지 사이즈를 기준점으로 삼습니다.
+    final double maxWidth = widget.imageSize.width;
+    final double maxHeight = widget.imageSize.height;
 
-        _boxCenter ??= Offset(
-          constraints.maxWidth / 2,
-          constraints.maxHeight / 2,
-        );
+    final boxSize = widget.controller.colorPickerBoxSize;
+    final half = boxSize / 2;
 
-        final clampedCenter = Offset(
-          _boxCenter!.dx.clamp(half, constraints.maxWidth - half),
-          _boxCenter!.dy.clamp(half, constraints.maxHeight - half),
-        );
+    // 최초 진입 시, 화면 중앙이 아니라 '이미지의 정중앙'에 박스를 배치합니다.
+    _boxCenter ??= Offset(maxWidth / 2, maxHeight / 2);
 
-        return Stack(
-          children: [
-            Positioned(
-              left: clampedCenter.dx - half,
-              top: clampedCenter.dy - half,
-              child: GestureDetector(
-                onPanUpdate: (details) {
-                  setState(() {
-                    _boxCenter = Offset(
-                      (_boxCenter!.dx + details.delta.dx).clamp(
-                        half,
-                        constraints.maxWidth - half,
-                      ),
-                      (_boxCenter!.dy + details.delta.dy).clamp(
-                        half,
-                        constraints.maxHeight - half,
-                      ),
-                    );
-                  });
-                },
-                onPanEnd: (_) => _analyze(clampedCenter),
-                child: CustomPaint(
-                  size: Size(boxSize, boxSize),
-                  painter: _SampleBoxPainter(),
-                ),
-              ),
+    final clampedCenter = Offset(
+      _boxCenter!.dx.clamp(half, maxWidth - half),
+      _boxCenter!.dy.clamp(half, maxHeight - half),
+    );
+    return Stack(
+      children: [
+        Positioned(
+          left: clampedCenter.dx - half,
+          top: clampedCenter.dy - half,
+          child: GestureDetector(
+            onPanUpdate: (details) {
+              setState(() {
+                _boxCenter = Offset(
+                  (_boxCenter!.dx + details.delta.dx).clamp(
+                    half,
+                    maxWidth - half,
+                  ),
+                  (_boxCenter!.dy + details.delta.dy).clamp(
+                    half,
+                    maxHeight - half,
+                  ),
+                );
+              });
+            },
+            onPanEnd: (_) => _analyze(clampedCenter),
+            child: CustomPaint(
+              size: Size(boxSize, boxSize),
+              painter: _SampleBoxPainter(),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }

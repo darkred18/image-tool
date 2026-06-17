@@ -8,11 +8,12 @@ class GridSubMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      behavior: HitTestBehavior.opaque,
-      child: _buildContent(context),
-    );
+    // return GestureDetector(
+    //   onTap: () {},
+    //   behavior: HitTestBehavior.opaque,
+    //   child: _buildContent(context),
+    // );
+    return SubMenuShell(children: [_buildContent(context)]);
   }
 
   Widget _buildContent(BuildContext context) {
@@ -136,7 +137,7 @@ class GridSubMenu extends StatelessWidget {
       ),
       selected: isSelected,
       selectedColor: Colors.blueAccent,
-      backgroundColor: Colors.white10,
+      backgroundColor: Colors.grey.shade700,
       onSelected: (_) => controller.setGridType(type),
     );
   }
@@ -150,7 +151,7 @@ class GridSubMenu extends StatelessWidget {
       ),
       selected: isSelected,
       selectedColor: Colors.teal,
-      backgroundColor: Colors.white10,
+      backgroundColor: Colors.grey.shade700,
       onSelected: (_) => controller.setSquareBasis(basis),
     );
   }
@@ -172,8 +173,8 @@ class GridSubMenu extends StatelessWidget {
         Expanded(
           child: Slider(
             value: value.toDouble(),
-            min: 2,
-            max: 12,
+            min: 1,
+            max: 11,
             divisions: 10,
             activeColor: Colors.blueAccent,
             inactiveColor: Colors.white12,
