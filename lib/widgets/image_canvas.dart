@@ -1,24 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
-import 'package:image_tools/features/color_picker/color_picker_overlay.dart';
-import 'package:image_tools/features/grid/grid_overlay.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 
-class ImageCanvas extends StatefulWidget {
+class ImageCanvas extends ConsumerStatefulWidget {
   final String imageUrl;
-  final EditPageController controller;
+  final int index;
 
-  const ImageCanvas({
-    super.key,
-    required this.imageUrl,
-    required this.controller,
-  });
+  const ImageCanvas({super.key, required this.imageUrl, required this.index});
 
   @override
-  State<ImageCanvas> createState() => _ImageCanvasState();
+  ConsumerState<ImageCanvas> createState() => _ImageCanvasState();
 }
 
-class _ImageCanvasState extends State<ImageCanvas> {
+class _ImageCanvasState extends ConsumerState<ImageCanvas> {
   Size? _rawImageSize;
   ImageStream? _imageStream;
   ImageStreamListener? _imageListener;
@@ -34,10 +29,14 @@ class _ImageCanvasState extends State<ImageCanvas> {
   @override
   void didUpdateWidget(covariant ImageCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 이미지 경로가 바뀌었거나(스와이프), 크롭된 경로가 새로 생성되었다면 다시 계산
-    if (oldWidget.imageUrl != widget.imageUrl ||
-        oldWidget.controller.previewCropPath !=
-            widget.controller.previewCropPath) {
+    final oldPreview = ref
+        .read(perspectiveCropProvider)
+        .previewPaths[oldWidget.index];
+    final newPreview = ref
+        .read(perspectiveCropProvider)
+        .previewPaths[widget.index];
+
+    if (oldWidget.imageUrl != widget.imageUrl || oldPreview != newPreview) {
       _clearStream();
       setState(() {
         _rawImageSize = null;
@@ -62,12 +61,12 @@ class _ImageCanvasState extends State<ImageCanvas> {
 
   void _resolveImageDimensions() {
     try {
-      final ImageProvider provider = FileImage(File(widget.imageUrl));
+      final provider = FileImage(File(widget.imageUrl));
       _imageStream = provider.resolve(const ImageConfiguration());
 
       _imageListener = ImageStreamListener(
         (ImageInfo info, bool synchronousCall) {
-          final Size size = Size(
+          final size = Size(
             info.image.width.toDouble(),
             info.image.height.toDouble(),
           );
@@ -86,22 +85,20 @@ class _ImageCanvasState extends State<ImageCanvas> {
           }
         },
         onError: (_, __) {
-          if (mounted) {
+          if (mounted)
             setState(() {
               _isLoading = false;
               _hasError = true;
             });
-          }
         },
       );
       _imageStream!.addListener(_imageListener!);
     } catch (_) {
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isLoading = false;
           _hasError = true;
         });
-      }
     }
   }
 
@@ -118,39 +115,39 @@ class _ImageCanvasState extends State<ImageCanvas> {
       );
     }
 
-    return ListenableBuilder(
-      listenable: widget.controller,
-      builder: (context, _) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final FittedSizes fittedSizes = applyBoxFit(
-              BoxFit.contain,
-              _rawImageSize!,
-              Size(constraints.maxWidth, constraints.maxHeight),
-            );
-            final Size renderedSize = fittedSizes.destination;
+    // 표시할 이미지 경로 결정 (filter > crop preview > 원본 순)
+    final cropState = ref.watch(perspectiveCropProvider);
+    final filterPreviewPath = ref.watch(filterProvider).filterPreviewPath;
+    final displayPath =
+        filterPreviewPath ??
+        cropState.previewPaths[widget.index] ??
+        widget.imageUrl;
 
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              widget.controller.updateImageWidgetSize(renderedSize);
-            });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fittedSizes = applyBoxFit(
+          BoxFit.contain,
+          _rawImageSize!,
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
+        final renderedSize = fittedSizes.destination;
 
-            return SizedBox.expand(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.file(
-                      File(
-                        widget.controller.filterPreviewPath ??
-                            widget.controller.previewCropPath ??
-                            widget.imageUrl,
-                      ),
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+        // 자기 index 기준으로 저장 → 옆 페이지가 덮어쓰는 버그 방지
+        final savedSize = ref.read(imageWidgetSizesProvider)[widget.index];
+        if (savedSize != renderedSize) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final current = Map<int, Size>.from(
+                ref.read(imageWidgetSizesProvider),
+              );
+              current[widget.index] = renderedSize;
+              ref.read(imageWidgetSizesProvider.notifier).state = current;
+            }
+          });
+        }
+
+        return SizedBox.expand(
+          child: Image.file(File(displayPath), fit: BoxFit.contain),
         );
       },
     );

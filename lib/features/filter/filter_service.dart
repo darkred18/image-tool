@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'package:dartcv4/dartcv.dart' as cv;
-import 'package:image_tools/features/filter/filter_controller.dart';
+import 'package:image_tools/controller/providers.dart';
 
 class FilterService {
   static Future<String> apply({
     required String imagePath,
-    required FilterType filterType,
+    required FilterType? filterType,
     required double strength,
   }) async {
+    if (filterType == null) return imagePath;
     final dir = File(imagePath).parent.path;
     final outPath =
         '$dir/filter_preview_${DateTime.now().millisecondsSinceEpoch}.jpg';

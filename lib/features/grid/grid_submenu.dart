@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 import 'package:image_tools/features/grid/grid_controller.dart';
 
-class GridSubMenu extends StatelessWidget {
-  final EditPageController controller;
-  const GridSubMenu({super.key, required this.controller});
+class GridSubMenu extends ConsumerWidget {
+  const GridSubMenu({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // return GestureDetector(
-    //   onTap: () {},
-    //   behavior: HitTestBehavior.opaque,
-    //   child: _buildContent(context),
-    // );
-    return SubMenuShell(children: [_buildContent(context)]);
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final grid = ref.watch(gridProvider);
+    final notifier = ref.read(gridProvider.notifier);
 
-  Widget _buildContent(BuildContext context) {
     final List<Color> palette = [
       Colors.white,
       Colors.yellow,
@@ -25,111 +19,106 @@ class GridSubMenu extends StatelessWidget {
       Colors.greenAccent,
     ];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color.fromRGBO(33, 33, 33, 0.95),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── 모드 선택 ────────────────────────────────────────────
+    return SubMenuShell(
+      children: [
+        // ── 모드 선택 ──────────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildTypeButton('정방형', GridType.square, grid, notifier),
+            _buildTypeButton('가로만', GridType.horizontal, grid, notifier),
+            _buildTypeButton('세로만', GridType.vertical, grid, notifier),
+          ],
+        ),
+        const Divider(color: Colors.white10, height: 24),
+
+        // ── 모드별 슬라이더 ────────────────────────────────────
+        if (grid.selectedGridType == GridType.square) ...[
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildTypeButton('정방형', GridType.square),
-              _buildTypeButton('가로만', GridType.horizontal),
-              _buildTypeButton('세로만', GridType.vertical),
+              _buildBasisButton('가로 기준', SquareBasis.width, grid, notifier),
+              const SizedBox(width: 12),
+              _buildBasisButton('세로 기준', SquareBasis.height, grid, notifier),
             ],
           ),
-          const Divider(color: Colors.white10, height: 24),
-
-          // ── 모드별 슬라이더 ──────────────────────────────────────
-          if (controller.selectedGridType == GridType.square) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildBasisButton('가로 기준', SquareBasis.width),
-                const SizedBox(width: 12),
-                _buildBasisButton('세로 기준', SquareBasis.height),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildSliderRow(
-              label: '분할 수',
-              value: controller.squareDivisions,
-              onChanged: (val) => controller.updateSquareDivisions(val.toInt()),
-            ),
-          ] else if (controller.selectedGridType == GridType.horizontal) ...[
-            _buildSliderRow(
-              label: '가로 분할',
-              value: controller.horizontalDivisions,
-              onChanged: (val) =>
-                  controller.updateHorizontalDivisions(val.toInt()),
-            ),
-          ] else ...[
-            _buildSliderRow(
-              label: '세로 분할',
-              value: controller.verticalDivisions,
-              onChanged: (val) =>
-                  controller.updateVerticalDivisions(val.toInt()),
-            ),
-          ],
-
-          const Divider(color: Colors.white10, height: 24),
-
-          // ── 선 색상 ──────────────────────────────────────────────
-          Row(
-            children: [
-              const Text(
-                '선 색상',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: palette.map((color) {
-                    final isSelected = controller.gridColor == color;
-                    return GestureDetector(
-                      onTap: () => controller.updateGridColor(color),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.blueAccent
-                                : Colors.white24,
-                            width: isSelected ? 3.0 : 1.0,
-                          ),
-                        ),
-                        child: isSelected
-                            ? Icon(
-                                Icons.check,
-                                size: 16,
-                                color: color == Colors.white
-                                    ? Colors.black
-                                    : Colors.white,
-                              )
-                            : null,
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
+          const SizedBox(height: 12),
+          _buildSliderRow(
+            label: '분할 수',
+            value: grid.squareDivisions,
+            onChanged: (val) => notifier.updateSquareDivisions(val.toInt()),
+          ),
+        ] else if (grid.selectedGridType == GridType.horizontal) ...[
+          _buildSliderRow(
+            label: '가로 분할',
+            value: grid.horizontalDivisions,
+            onChanged: (val) => notifier.updateHorizontalDivisions(val.toInt()),
+          ),
+        ] else ...[
+          _buildSliderRow(
+            label: '세로 분할',
+            value: grid.verticalDivisions,
+            onChanged: (val) => notifier.updateVerticalDivisions(val.toInt()),
           ),
         ],
-      ),
+
+        const Divider(color: Colors.white10, height: 24),
+
+        // ── 선 색상 ────────────────────────────────────────────
+        Row(
+          children: [
+            const Text(
+              '선 색상',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: palette.map((color) {
+                  final isSelected = grid.gridColor == color;
+                  return GestureDetector(
+                    onTap: () => notifier.updateGridColor(color),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected
+                              ? Colors.blueAccent
+                              : Colors.white24,
+                          width: isSelected ? 3.0 : 1.0,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(
+                              Icons.check,
+                              size: 16,
+                              color: color == Colors.white
+                                  ? Colors.black
+                                  : Colors.white,
+                            )
+                          : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildTypeButton(String text, GridType type) {
-    final isSelected = controller.selectedGridType == type;
+  Widget _buildTypeButton(
+    String text,
+    GridType type,
+    GridState grid,
+    GridNotifier notifier,
+  ) {
+    final isSelected = grid.selectedGridType == type;
     return ChoiceChip(
       label: Text(
         text,
@@ -138,12 +127,17 @@ class GridSubMenu extends StatelessWidget {
       selected: isSelected,
       selectedColor: Colors.blueAccent,
       backgroundColor: Colors.grey.shade700,
-      onSelected: (_) => controller.setGridType(type),
+      onSelected: (_) => notifier.setGridType(type),
     );
   }
 
-  Widget _buildBasisButton(String text, SquareBasis basis) {
-    final isSelected = controller.squareBasis == basis;
+  Widget _buildBasisButton(
+    String text,
+    SquareBasis basis,
+    GridState grid,
+    GridNotifier notifier,
+  ) {
+    final isSelected = grid.squareBasis == basis;
     return ChoiceChip(
       label: Text(
         text,
@@ -152,7 +146,7 @@ class GridSubMenu extends StatelessWidget {
       selected: isSelected,
       selectedColor: Colors.teal,
       backgroundColor: Colors.grey.shade700,
-      onSelected: (_) => controller.setSquareBasis(basis),
+      onSelected: (_) => notifier.setSquareBasis(basis),
     );
   }
 

@@ -1,122 +1,89 @@
-// ============================================================
-// ✂️ 원근 크롭 서브메뉴
-// ============================================================
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 import 'package:image_tools/features/perspective_crop/perspective_transform_service.dart';
 
-class PerspectiveSubMenu extends StatelessWidget {
-  final EditPageController controller;
-  const PerspectiveSubMenu({super.key, required this.controller});
+class PerspectiveSubMenu extends ConsumerWidget {
+  const PerspectiveSubMenu({super.key});
 
-  Future<void> _runTransform(BuildContext context) async {
-    final index = controller.currentIndex;
-    final points = controller.getCropPoints(index);
-    final imageWidgetSize = controller.imageWidgetSize;
+  Future<void> _runTransformAndSave(WidgetRef ref, BuildContext context) async {
+    final index = ref.read(currentIndexProvider);
+    final cropState = ref.read(perspectiveCropProvider);
+    final points = cropState.cropPoints[index];
+    final imageWidgetSize = ref.read(currentImageWidgetSizeProvider);
+    final images = ref.read(imagesProvider);
+
     if (points == null || imageWidgetSize == null) return;
 
-    controller.setCropProcessing(true);
+    ref.read(perspectiveCropProvider.notifier).setProcessing(true);
     try {
+      // 1. 원근 변환
       final previewPath = await PerspectiveTransformService.transform(
-        imagePath: controller.images[index],
+        imagePath: images[index],
         points: points,
         imageWidgetSize: imageWidgetSize,
       );
-      controller.setCropPreview(previewPath);
+
+      // 2. 즉시 저장
+      final savedPath = await PerspectiveTransformService.save(
+        previewPath: previewPath,
+        originalPath: images[index],
+      );
+
+      // 3. 현재 이미지를 저장된 파일로 교체
+      final updatedImages = List<String>.from(images);
+      updatedImages[index] = savedPath;
+      ref.read(imagesProvider.notifier).state = updatedImages;
+
+      // 4. 크롭 상태 초기화 (새 이미지 기준으로 다시 시작)
+      ref.read(perspectiveCropProvider.notifier).reset(index);
+
+      // 5. 툴 닫기
+      ref.read(activeToolProvider.notifier).state = EditTool.none;
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('✅ 새 파일로 저장되었습니다.')));
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('변환 실패: $e')));
-        print('Perspective transform error: $e');
+        debugPrint('Perspective transform error: $e');
       }
     } finally {
-      controller.setCropProcessing(false);
-    }
-  }
-
-  Future<void> _save(BuildContext context) async {
-    final previewPath = controller.previewCropPath;
-    if (previewPath == null) return;
-
-    final choice = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF222222),
-        title: const Text('저장', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          '새로 저장하게 됩니다.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        // actions: [
-        //   TextButton(
-        //     onPressed: () => Navigator.pop(ctx, false),
-        //     child: const Text('새 파일로 저장'),
-        //   ),
-        //   TextButton(
-        //     onPressed: () => Navigator.pop(ctx, true),
-        //     child: const Text(
-        //       '원본 덮어쓰기',
-        //       style: TextStyle(color: Colors.redAccent),
-        //     ),
-        //   ),
-        // ],
-      ),
-    );
-
-    if (choice == null || !context.mounted) return;
-
-    await PerspectiveTransformService.save(
-      previewPath: previewPath,
-      originalPath: controller.images[controller.currentIndex],
-      // overwrite: choice,
-    );
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('저장 완료')));
+      ref.read(perspectiveCropProvider.notifier).setProcessing(false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final hasPreview = controller.previewCropPath != null;
-    final isProcessing = controller.isCropProcessing;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isProcessing = ref.watch(perspectiveCropProvider).isProcessing;
 
     return SubMenuShell(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton.icon(
-              onPressed: isProcessing ? null : () => _runTransform(context),
-              icon: isProcessing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.crop_rotate, size: 18),
-              label: Text(isProcessing ? '처리 중...' : '변환 적용'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: hasPreview ? () => _save(context) : null,
-              icon: const Icon(Icons.save_alt, size: 18),
-              label: const Text('저장'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+        ElevatedButton.icon(
+          onPressed: isProcessing
+              ? null
+              : () => _runTransformAndSave(ref, context),
+          icon: isProcessing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.crop_rotate, size: 18),
+          label: Text(isProcessing ? '처리 중...' : '변환 및 저장'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blueAccent,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 44),
+          ),
         ),
       ],
     );

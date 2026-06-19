@@ -1,5 +1,4 @@
 import 'dart:isolate';
-import 'dart:io';
 import 'package:dartcv4/dartcv.dart' as cv;
 import 'package:flutter/material.dart';
 

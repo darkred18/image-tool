@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 
-class PerspectiveCropOverlay extends StatefulWidget {
-  final EditPageController controller;
+class PerspectiveCropOverlay extends ConsumerStatefulWidget {
   final Size imageSize;
+  final int index;
 
   const PerspectiveCropOverlay({
     super.key,
-    required this.controller,
     required this.imageSize,
+    required this.index,
   });
 
   @override
-  State<PerspectiveCropOverlay> createState() => _PerspectiveCropOverlayState();
+  ConsumerState<PerspectiveCropOverlay> createState() =>
+      _PerspectiveCropOverlayState();
 }
 
-class _PerspectiveCropOverlayState extends State<PerspectiveCropOverlay> {
+class _PerspectiveCropOverlayState
+    extends ConsumerState<PerspectiveCropOverlay> {
   List<Offset> _defaultPoints() {
     final w = widget.imageSize.width;
     final h = widget.imageSize.height;
@@ -28,38 +31,30 @@ class _PerspectiveCropOverlayState extends State<PerspectiveCropOverlay> {
     ];
   }
 
-  List<Offset> get _points {
-    return widget.controller.getCropPoints(widget.controller.currentIndex) ??
-        _defaultPoints();
-  }
-
-  void _updatePoints(List<Offset> points) {
-    widget.controller.updateCropPoints(widget.controller.currentIndex, points);
-  }
-
   @override
   void initState() {
     super.initState();
-    // 처음 진입 시 기본값 저장
-    if (widget.controller.getCropPoints(widget.controller.currentIndex) ==
-        null) {
+    // 처음 진입 시 기본 꼭짓점 저장
+    final existing = ref.read(perspectiveCropProvider).cropPoints[widget.index];
+    if (existing == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updatePoints(_defaultPoints());
+        ref
+            .read(perspectiveCropProvider.notifier)
+            .updatePoints(widget.index, _defaultPoints());
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final points = _points;
+    final points =
+        ref.watch(perspectiveCropProvider).cropPoints[widget.index] ??
+        _defaultPoints();
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        CustomPaint(
-          // size: widget.imageSize,
-          painter: _PolygonLinePainter(points: points),
-        ),
+        CustomPaint(painter: _PolygonLinePainter(points: points)),
         ...List.generate(4, (i) => _buildHandle(i, points)),
       ],
     );
@@ -75,10 +70,10 @@ class _PerspectiveCropOverlayState extends State<PerspectiveCropOverlay> {
       child: GestureDetector(
         onPanUpdate: (details) {
           final updated = List<Offset>.from(points);
-          final newPos = updated[index] + details.delta;
-
-          updated[index] = newPos;
-          _updatePoints(updated);
+          updated[index] = updated[index] + details.delta;
+          ref
+              .read(perspectiveCropProvider.notifier)
+              .updatePoints(widget.index, updated);
         },
         child: Container(
           width: handleSize,
@@ -100,6 +95,7 @@ class _PolygonLinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (points.length < 4) return;
     final paint = Paint()
       ..color = Colors.greenAccent
       ..strokeWidth = 1.5

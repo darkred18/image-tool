@@ -1,53 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 
-class BottomToolBar extends StatelessWidget {
-  final EditPageController controller;
-  const BottomToolBar({super.key, required this.controller});
+class BottomToolBar extends ConsumerWidget {
+  const BottomToolBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
-      onTap: () {}, // 이벤트가 아래 이미지 GestureDetector로 전파되는 것을 차단
+      onTap: () {},
       behavior: HitTestBehavior.opaque,
       child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [Color(0xCC000000), Colors.transparent],
-          ),
-        ),
+        // ✅ 불투명 배경
+        color: const Color(0xDD000000),
         child: SafeArea(
           top: false,
           child: SizedBox(
             height: 80,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
+              children: const [
                 _ToolButton(
                   icon: Icons.crop,
                   label: '크롭',
                   tool: EditTool.perspective,
-                  controller: controller,
                 ),
                 _ToolButton(
                   icon: Icons.grid_on,
                   label: '그리드',
                   tool: EditTool.grid,
-                  controller: controller,
                 ),
                 _ToolButton(
                   icon: Icons.colorize,
                   label: '색상 분석',
                   tool: EditTool.colorPicker,
-                  controller: controller,
                 ),
                 _ToolButton(
                   icon: Icons.auto_awesome,
                   label: '필터',
                   tool: EditTool.filter,
-                  controller: controller,
                 ),
               ],
             ),
@@ -58,25 +49,29 @@ class BottomToolBar extends StatelessWidget {
   }
 }
 
-class _ToolButton extends StatelessWidget {
+class _ToolButton extends ConsumerWidget {
   final IconData icon;
   final String label;
   final EditTool tool;
-  final EditPageController controller;
 
   const _ToolButton({
     required this.icon,
     required this.label,
     required this.tool,
-    required this.controller,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bool isActive = controller.activeTool == tool;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeTool = ref.watch(activeToolProvider);
+    final isActive = activeTool == tool;
 
     return GestureDetector(
-      onTap: () => controller.selectTool(tool),
+      onTap: () {
+        // ✅ 같은 툴 한 번 더 누르면 꺼짐
+        ref.read(activeToolProvider.notifier).state = isActive
+            ? EditTool.none
+            : tool;
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

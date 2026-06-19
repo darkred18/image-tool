@@ -1,26 +1,27 @@
 import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
+
 import 'package:image_tools/features/color_picker/color_alalysis_service.dart';
 
-class ColorPickerOverlay extends StatefulWidget {
-  final EditPageController controller;
+class ColorPickerOverlay extends ConsumerStatefulWidget {
   final Size imageSize;
   final String imageUrl;
 
   const ColorPickerOverlay({
     super.key,
-    required this.controller,
+
     required this.imageSize,
     required this.imageUrl,
   });
 
   @override
-  State<ColorPickerOverlay> createState() => _ColorPickerOverlayState();
+  ConsumerState<ColorPickerOverlay> createState() => _ColorPickerOverlayState();
 }
 
-class _ColorPickerOverlayState extends State<ColorPickerOverlay> {
+class _ColorPickerOverlayState extends ConsumerState<ColorPickerOverlay> {
   Offset? _boxCenter;
   ui.Image? _uiImage;
 
@@ -42,10 +43,10 @@ class _ColorPickerOverlayState extends State<ColorPickerOverlay> {
   /// 박스 영역을 ui.Image에서 크롭해서 프리뷰로 저장
   Future<void> _updatePreview(Offset boxCenter) async {
     final image = _uiImage;
-    final imageWidgetSize = widget.controller.imageWidgetSize;
+    final imageWidgetSize = ref.read(currentImageWidgetSizeProvider);
     if (image == null || imageWidgetSize == null) return;
 
-    final boxSize = widget.controller.colorPickerBoxSize;
+    final boxSize = ref.read(colorPickerProvider).boxSize;
     final scaleX = image.width / imageWidgetSize.width;
     final scaleY = image.height / imageWidgetSize.height;
 
@@ -77,28 +78,29 @@ class _ColorPickerOverlayState extends State<ColorPickerOverlay> {
     final picture = recorder.endRecording();
     final cropped = await picture.toImage(80, 80);
 
-    widget.controller.updatePreviewImage(cropped);
+    ref.read(colorPickerProvider.notifier).updatePreviewImage(cropped);
   }
 
   Future<void> _analyze(Offset boxCenter) async {
-    if (widget.controller.imageWidgetSize == null) return;
+    final imageWidgetSize = ref.read(currentImageWidgetSizeProvider);
+    if (imageWidgetSize == null) return;
 
-    // 프리뷰 업데이트
     await _updatePreview(boxCenter);
 
-    widget.controller.setAnalyzing(true);
+    final notifier = ref.read(colorPickerProvider.notifier);
+    notifier.setAnalyzing(true);
     try {
       final mixes = await ColorAnalysisService.analyze(
         imagePath: widget.imageUrl,
         boxCenter: boxCenter,
-        boxSize: widget.controller.colorPickerBoxSize,
-        imageWidgetSize: widget.controller.imageWidgetSize!,
+        boxSize: ref.read(colorPickerProvider).boxSize,
+        imageWidgetSize: imageWidgetSize,
       );
-      widget.controller.setPaintMixes(mixes);
+      notifier.setPaintMixes(mixes);
     } catch (e) {
       debugPrint('Color analysis error: $e');
     } finally {
-      widget.controller.setAnalyzing(false);
+      notifier.setAnalyzing(false);
     }
   }
 
@@ -108,7 +110,7 @@ class _ColorPickerOverlayState extends State<ColorPickerOverlay> {
     final double maxWidth = widget.imageSize.width;
     final double maxHeight = widget.imageSize.height;
 
-    final boxSize = widget.controller.colorPickerBoxSize;
+    final boxSize = ref.watch(colorPickerProvider).boxSize;
     final half = boxSize / 2;
 
     // 최초 진입 시, 화면 중앙이 아니라 '이미지의 정중앙'에 박스를 배치합니다.

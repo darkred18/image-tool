@@ -1,23 +1,21 @@
-// ============================================================
-// 🎨 색상 분석 서브메뉴
-// ============================================================
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 
-class ColorPickerSubMenu extends StatelessWidget {
-  final EditPageController controller;
-  const ColorPickerSubMenu({super.key, required this.controller});
+class ColorPickerSubMenu extends ConsumerWidget {
+  const ColorPickerSubMenu({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final paintMix = controller.paintMixes;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(colorPickerProvider);
+    final notifier = ref.read(colorPickerProvider.notifier);
 
     return SubMenuShell(
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 왼쪽: 이미지 프리뷰 (ColorPickerOverlay에서 uiImage 전달 필요)
+            // ── 프리뷰 이미지 ────────────────────────────────
             Container(
               width: 80,
               height: 80,
@@ -25,10 +23,10 @@ class ColorPickerSubMenu extends StatelessWidget {
                 border: Border.all(color: Colors.white24),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: controller.previewImage != null
+              child: state.previewImage != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(3),
-                      child: RawImage(image: controller.previewImage),
+                      child: RawImage(image: state.previewImage),
                     )
                   : const Center(
                       child: Icon(
@@ -39,7 +37,7 @@ class ColorPickerSubMenu extends StatelessWidget {
                     ),
             ),
             const SizedBox(width: 16),
-            // 오른쪽: 물감 조합
+            // ── 물감 조합 결과 ────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +51,7 @@ class ColorPickerSubMenu extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  if (controller.isAnalyzing)
+                  if (state.isAnalyzing)
                     const Row(
                       children: [
                         SizedBox(
@@ -71,13 +69,13 @@ class ColorPickerSubMenu extends StatelessWidget {
                         ),
                       ],
                     )
-                  else if (paintMix.isEmpty)
+                  else if (state.paintMixes.isEmpty)
                     const Text(
                       '박스를 드래그 후 놓으세요',
                       style: TextStyle(color: Colors.white38, fontSize: 11),
                     )
                   else
-                    ...paintMix.expand(
+                    ...state.paintMixes.expand(
                       (mix) => mix.components.map(
                         (c) => Padding(
                           padding: const EdgeInsets.only(bottom: 3),
@@ -120,24 +118,24 @@ class ColorPickerSubMenu extends StatelessWidget {
           ],
         ),
         const Divider(color: Colors.white10, height: 20),
-        // 박스 크기 슬라이더
+        // ── 박스 크기 슬라이더 ────────────────────────────────
         Row(
           children: [
             SizedBox(
               width: 80,
               child: Text(
-                '박스 크기 (${controller.colorPickerBoxSize.toInt()})',
+                '박스 크기 (${state.boxSize.toInt()})',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ),
             Expanded(
               child: Slider(
-                value: controller.colorPickerBoxSize,
+                value: state.boxSize,
                 min: 10,
                 max: 100,
                 activeColor: Colors.blueAccent,
                 inactiveColor: Colors.white12,
-                onChanged: (v) => controller.updateColorPickerBoxSize(v),
+                onChanged: (v) => notifier.updateBoxSize(v),
               ),
             ),
           ],

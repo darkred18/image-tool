@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:image_tools/controller/edit_page_controller.dart';
-import 'package:image_tools/features/filter/filter_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_tools/controller/providers.dart';
 import 'package:image_tools/features/filter/filter_service.dart';
 
-class FilterSubMenu extends StatelessWidget {
-  final EditPageController controller;
-  const FilterSubMenu({super.key, required this.controller});
+class FilterSubMenu extends ConsumerWidget {
+  const FilterSubMenu({super.key});
 
-  Future<void> _apply(BuildContext context) async {
-    controller.setFilterProcessing(true);
+  Future<void> _apply(BuildContext context, WidgetRef ref) async {
+    final images = ref.read(imagesProvider);
+    final index = ref.read(currentIndexProvider);
+    final state = ref.read(filterProvider);
+    final notifier = ref.read(filterProvider.notifier);
+
+    notifier.setFilterProcessing(true);
     try {
       final path = await FilterService.apply(
-        imagePath: controller.images[controller.currentIndex],
-        filterType: controller.selectedFilter,
-        strength: controller.filterStrength,
+        imagePath: images[index],
+        filterType: state.selectedFilter,
+        strength: state.filterStrength,
       );
-      controller.setFilterPreview(path);
+      notifier.setFilterPreview(path);
+      ref.read(filterPreviewPathProvider.notifier).state = path;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -23,12 +28,15 @@ class FilterSubMenu extends StatelessWidget {
         ).showSnackBar(SnackBar(content: Text('필터 적용 실패: $e')));
       }
     } finally {
-      controller.setFilterProcessing(false);
+      notifier.setFilterProcessing(false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(filterProvider);
+    final notifier = ref.read(filterProvider.notifier);
+
     final filters = [
       (FilterType.edge, Icons.auto_fix_high, '엣지'),
       (FilterType.simplify, Icons.palette, '색상 단순화'),
@@ -36,123 +44,118 @@ class FilterSubMenu extends StatelessWidget {
       (FilterType.blur, Icons.blur_on, '부드럽게'),
     ];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color.fromRGBO(33, 33, 33, 0.95),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 필터 선택
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: filters.map((f) {
-              final isSelected = controller.selectedFilter == f.$1;
-              return GestureDetector(
-                onTap: () {
-                  controller.setFilterType(f.$1);
-                  _apply(context);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+    return SubMenuShell(
+      children: [
+        // ── 처리 중 인디케이터 ─────────────────────────────
+        if (state.isFilterProcessing)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white54,
                   ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Colors.blueAccent.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected ? Colors.blueAccent : Colors.white24,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '적용 중...',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        // ── 필터 선택 ──────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: filters.map((f) {
+            final isSelected = state.selectedFilter == f.$1;
+            return GestureDetector(
+              onTap: () {
+                final next = isSelected ? null : f.$1;
+                notifier.setFilterType(next);
+                if (next == null) {
+                  ref.read(filterPreviewPathProvider.notifier).state = null;
+                } else {
+                  _apply(context, ref);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.blueAccent.withValues(alpha: 0.25)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? Colors.blueAccent : Colors.white24,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      f.$2,
+                      color: isSelected ? Colors.blueAccent : Colors.white54,
+                      size: 20,
                     ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        f.$2,
+                    const SizedBox(height: 4),
+                    Text(
+                      f.$3,
+                      style: TextStyle(
                         color: isSelected ? Colors.blueAccent : Colors.white54,
-                        size: 20,
+                        fontSize: 10,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        f.$3,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.blueAccent
-                              : Colors.white54,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const Divider(color: Colors.white10, height: 24),
-          // 강도 슬라이더
-          Row(
-            children: [
-              const SizedBox(
-                width: 40,
-                child: Text(
-                  '강도',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: Slider(
-                  value: controller.filterStrength,
-                  min: 0.0,
-                  max: 1.0,
-                  activeColor: Colors.blueAccent,
-                  inactiveColor: Colors.white12,
-                  onChanged: (v) => controller.setFilterStrength(v),
-                  onChangeEnd: (v) => _apply(context), // 슬라이더 놓을 때 자동 적용
-                ),
+            );
+          }).toList(),
+        ),
+
+        const Divider(color: Colors.white10, height: 24),
+
+        // ── 강도 슬라이더 ──────────────────────────────────
+        Row(
+          children: [
+            const SizedBox(
+              width: 40,
+              child: Text(
+                '강도',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${(controller.filterStrength * 100).toInt()}%',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  textAlign: TextAlign.right,
-                ),
+            ),
+            Expanded(
+              child: Slider(
+                value: state.filterStrength,
+                min: 0.0,
+                max: 1.0,
+                activeColor: Colors.blueAccent,
+                inactiveColor: Colors.white12,
+                onChanged: (v) => notifier.setFilterStrength(v),
+                onChangeEnd: (v) => _apply(context, ref),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // // 적용 버튼
-          // SizedBox(
-          //   width: double.infinity,
-          //   child: ElevatedButton.icon(
-          //     onPressed: controller.isFilterProcessing
-          //         ? null
-          //         : () => _apply(context),
-          //     icon: controller.isFilterProcessing
-          //         ? const SizedBox(
-          //             width: 16,
-          //             height: 16,
-          //             child: CircularProgressIndicator(
-          //               strokeWidth: 2,
-          //               color: Colors.white,
-          //             ),
-          //           )
-          //         : const Icon(Icons.check, size: 18),
-          //     label: Text(controller.isFilterProcessing ? '처리 중...' : '필터 적용'),
-          //     style: ElevatedButton.styleFrom(
-          //       backgroundColor: Colors.blueAccent,
-          //       foregroundColor: Colors.white,
-          //     ),
-          //   ),
-          // ),
-        ],
-      ),
+            ),
+            SizedBox(
+              width: 36,
+              child: Text(
+                '${(state.filterStrength * 100).toInt()}%',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
